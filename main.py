@@ -80,7 +80,7 @@ async def delete_euron_data(phone:int):
     else:
         raise HTTPException(status_code=404, detail="Data not found")
 
-@app.get("/euron/getdata/{id}")
+@app.get("/euron/getdata/{phone}")
 async def get_euron_data(phone:int):
     iterms = []
     cursor = euron_data.find({"phone": phone})
