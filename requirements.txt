@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+motor #driver
+python-dotenv
+pymongo[srv]
