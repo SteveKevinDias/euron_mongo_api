@@ -1,6 +1,8 @@
 from fastapi import FastAPI,HTTPException
+from fastapi.responses import HTMLResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
+from fastapi.staticfiles import StaticFiles
 from bson import ObjectId
 import os
 from dotenv import load_dotenv
@@ -35,6 +37,13 @@ class eurondata(BaseModel):
     phone:int
     city:str
     course:str
+
+@app.get("/")
+def serve_home():
+    with open("static/index.html") as file:
+        return HTMLResponse(content=file.read())
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.post("/euron/insert")
 async def euron_data_insert_helper(data:eurondata):

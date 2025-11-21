@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI Euron Data Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {https://euron-mongo-api-j73m.onrender.com
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f9;
+        }
+        .form-card {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s;
+        }
+        .form-card:hover {
+            transform: translateY(-2px);
+        }
+        .input-field {
+            border: 1px solid #d1d5db;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            width: 100%;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-field:focus {
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+            outline: none;
+        }
+        .btn-primary {
+            background-color: #4f46e5;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s, opacity 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: #4338ca;
+        }
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .login-card {
+            max-width: 400px;
+            margin: 10vh auto;
+            padding: 2rem;
+            background-color: white;
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        /* Spinner for loading state */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #4f46e5;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="loginContainer" class="login-card">
+        <h1 class="text-3xl font-extrabold text-gray-900 mb-2 text-center">Admin Login</h1>
+        <p class="text-sm text-gray-500 mb-6 text-center">Enter credentials to access the Euron Data Portal.</p>
+        <form id="loginForm" class="space-y-4">
+            <div>
+                <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                <input type="text" id="username" placeholder="Enter Username" class="input-field" required>
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input type="password" id="password" placeholder="Enter Password" class="input-field" required>
+            </div>
+            <div id="loginMessage" class="text-sm text-red-600 hidden"></div>
+            <button type="submit" id="loginBtn" class="btn-primary w-full mt-4">Login</button>
+        </form>
+    </div>
+
+    <div id="mainContent" class="hidden max-w-6xl mx-auto">
+        <h1 class="text-4xl font-extrabold text-gray-900 mb-2">Euron MongoDB Manager</h1>
+        <p class="text-lg text-gray-600 mb-4">FastAPI Backend Client for MongoDB CRUD Operations.</p>
+        
+        <div id="messages" class="mb-6 p-4 rounded-lg hidden" role="alert"></div>
+        
+        <div class="bg-white p-6 rounded-xl border border-gray-200 form-card mb-8">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">Search Data by Phone (GET /euron/getdata/{phone})</h2>
+            <form id="searchForm" class="space-y-4 md:flex md:space-y-0 md:space-x-4">
+                <input type="number" id="searchPhone" placeholder="Enter Phone Number to Search (e.g., 9876543210)" class="input-field flex-grow" required>
+                <button type="submit" id="searchBtn" class="btn-primary bg-blue-600 hover:bg-blue-700">Search Data</button>
+            </form>
+            <div id="searchResult" class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg hidden">
+                <p class="font-semibold text-blue-800">Result:</p>
+                <code id="searchCode" class="block whitespace-pre-wrap text-sm text-blue-700"></code>
+            </div>
+            <div id="searchError" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg hidden text-sm text-red-700"></div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+            <div class="form-card bg-white p-6 rounded-xl border border-gray-200 lg:col-span-2">
+                <h2 class="text-2xl font-bold text-indigo-700 mb-4">1. Insert Data (POST /euron/insert)</h2>
+                <form id="insertForm" class="space-y-4">
+                    <input type="text" id="insertName" placeholder="Name" class="input-field" required>
+                    <input type="number" id="insertPhone" placeholder="Phone Number (Primary Key)" class="input-field" required>
+                    <input type="text" id="insertCity" placeholder="City" class="input-field" required>
+                    <input type="text" id="insertCourse" placeholder="Course" class="input-field" required>
+                    <button type="submit" id="insertBtn" class="btn-primary w-full">Insert Data</button>
+                </form>
+            </div>
+
+            <div class="form-card bg-white p-6 rounded-xl border border-gray-200">
+                <h2 class="text-2xl font-bold text-red-700 mb-4">3. Delete Data (DELETE /euron/delete/{phone})</h2>
+                <form id="deleteForm" class="space-y-4">
+                    <input type="number" id="deletePhone" placeholder="Phone Number to Delete" class="input-field" required>
+                    <button type="submit" id="deleteBtn" class="btn-primary w-full bg-red-600 hover:bg-red-700">Delete Data</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-gray-200 form-card mb-12">
+            <h2 class="text-2xl font-bold text-yellow-700 mb-4">2. Update Data (PUT /euron/update/{phone})</h2>
+            <form id="updateForm" class="space-y-4 md:grid md:grid-cols-5 md:gap-4">
+                <input type="number" id="updatePhone" placeholder="Phone Number to Update (Key)" class="input-field md:col-span-1" required>
+                <input type="text" id="updateName" placeholder="New Name" class="input-field md:col-span-1" required>
+                <input type="text" id="updateCity" placeholder="New City" class="input-field md:col-span-1" required>
+                <input type="text" id="updateCourse" placeholder="New Course" class="input-field md:col-col-span-1" required>
+                <button type="submit" id="updateBtn" class="btn-primary w-full bg-yellow-600 hover:bg-yellow-700 md:col-span-1">Update Data</button>
+            </form>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-gray-200 form-card">
+            <h2 class="text-3xl font-bold text-gray-900 mb-4">All Euron Records (GET /euron/getdata)</h2>
+            <button onclick="fetchEuronData()" class="btn-primary mb-4 bg-gray-500 hover:bg-gray-600">Refresh Data List</button>
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID (MongoDB)</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">City</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTableBody" class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">Log in to view data.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // NOTE: This URL has been updated to your live Render deployment.
+        const API_BASE_URL = "https://euron-mongo-api-j73m.onrender.com"; 
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- Authentication Credentials ---
+            // These must match your hardcoded values or be replaced with a proper token system.
+            const ADMIN_USER = "admin";
+            const ADMIN_PASS = "sd_123";
+
+            // --- DOM Elements ---
+            const loginContainer = document.getElementById('loginContainer');
+            const loginForm = document.getElementById('loginForm');
+            const loginMessage = document.getElementById('loginMessage');
+            const mainContent = document.getElementById('mainContent');
+            const messagesDiv = document.getElementById('messages');
+            const dataTableBody = document.getElementById('dataTableBody'); 
+            const searchForm = document.getElementById('searchForm');
+            const searchBtn = document.getElementById('searchBtn');
+            const searchResultDiv = document.getElementById('searchResult');
+            const searchCode = document.getElementById('searchCode');
+            const searchErrorDiv = document.getElementById('searchError');
+            const insertBtn = document.getElementById('insertBtn');
+            const updateBtn = document.getElementById('updateBtn');
+            const deleteBtn = document.getElementById('deleteBtn');
+
+
+            /**
+             * Utility function to display success or error messages to the user (main app).
+             * @param {string} message - The message content.
+             * @param {string} type - 'success' or 'error'.
+             */
+            function showMessage(message, type) {
+                messagesDiv.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'border-green-400', 'border-red-400');
+                messagesDiv.textContent = message;
+
+                if (type === 'success') {
+                    messagesDiv.classList.add('bg-green-100', 'text-green-800', 'border', 'border-green-400');
+                } else if (type === 'error') {
+                    messagesDiv.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-400');
+                }
+                setTimeout(() => {
+                    messagesDiv.classList.add('hidden');
+                }, 5000);
+            }
+            
+            /**
+             * Fetches resources with exponential backoff and retry logic for network errors.
+             * @param {string} url - The API endpoint URL.
+             * @param {object} options - Fetch options (method, headers, body, etc.).
+             * @param {number} maxRetries - Maximum number of retries.
+             * @param {number} delay - Initial delay in milliseconds.
+             * @returns {Promise<Response>} The fetch response object.
+             * @throws {Error} If all retries fail due to a network error.
+             */
+            async function fetchWithRetry(url, options = {}, maxRetries = 3, delay = 1000) {
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        const response = await fetch(url, options);
+                        // We return the response even if not response.ok, so the caller can handle 4xx/5xx errors
+                        return response; 
+                    } catch (error) {
+                        // This catches network/CORS errors (e.g., connection refused, timeout).
+                        if (i === maxRetries - 1) {
+                            // Last attempt failed, throw the network error
+                            throw new Error(`Failed to connect to API at ${API_BASE_URL}. Ensure the service is running.`);
+                        }
+                        // Exponential Backoff: Wait for delay * 2^i milliseconds before retrying
+                        const sleepTime = delay * (2 ** i);
+                        console.warn(`Fetch failed (attempt ${i + 1}/${maxRetries}). Retrying in ${sleepTime}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, sleepTime));
+                    }
+                }
+            }
+
+
+            // --- Authentication Logic ---
+
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+
+                if (username === ADMIN_USER && password === ADMIN_PASS) {
+                    // Successful Login
+                    loginContainer.classList.add('hidden');
+                    mainContent.classList.remove('hidden');
+                    // Fetch data immediately after successful login
+                    fetchEuronData(); 
+                } else {
+                    // Failed Login
+                    loginMessage.textContent = "Invalid username or password.";
+                    loginMessage.classList.remove('hidden');
+                    // Clear password field for security
+                    document.getElementById('password').value = ''; 
+                    setTimeout(() => {
+                        loginMessage.classList.add('hidden');
+                    }, 3000);
+                }
+            });
+
+
+            // --- Search/Read Single Data Logic ---
+            searchForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                searchBtn.disabled = true;
+                searchBtn.innerHTML = '<span class="spinner"></span>Searching...';
+
+                const phone = document.getElementById('searchPhone').value; 
+                
+                // Clear previous results
+                searchResultDiv.classList.add('hidden');
+                searchErrorDiv.classList.add('hidden');
+                searchErrorDiv.textContent = '';
+                searchCode.textContent = '';
+
+                if (!phone) {
+                    searchBtn.disabled = false;
+                    searchBtn.textContent = 'Search Data';
+                    return;
+                }
+
+                try {
+                    // Using GET /euron/getdata/{phone} endpoint
+                    const response = await fetchWithRetry(`${API_BASE_URL}/euron/getdata/${phone}`);
+                    
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        // FastAPI returns 404/422/500 with JSON containing a 'detail' field for errors
+                        throw new Error(result.message || result.detail || `HTTP error! Status: ${response.status}`);
+                    }
+                    
+                    // The backend returns an array for a single search, so we check the length
+                    if (result.length === 0) {
+                        throw new Error(`No record found with phone number: ${phone}`);
+                    }
+                    
+                    searchCode.textContent = JSON.stringify(result[0], null, 2); // Display the first result
+                    searchResultDiv.classList.remove('hidden');
+
+                } catch (error) {
+                    console.error("Search error:", error);
+                    searchErrorDiv.textContent = error.message;
+                    searchErrorDiv.classList.remove('hidden');
+                } finally {
+                    searchBtn.disabled = false;
+                    searchBtn.textContent = 'Search Data';
+                }
+            });
+
+
+            // --- CRUD/API Logic ---
+
+            /**
+             * Fetches all Euron data and populates the table. Uses GET /euron/getdata
+             */
+            window.fetchEuronData = async function() { 
+                // Check if content is visible (i.e., user is logged in)
+                if (mainContent.classList.contains('hidden')) {
+                    dataTableBody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Please log in to view data.</td></tr>';
+                    return;
+                }
+
+                dataTableBody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500"><span class="spinner"></span>Fetching data...</td></tr>';
+                try {
+                    // Using the new endpoint /euron/getdata
+                    const response = await fetchWithRetry(`${API_BASE_URL}/euron/getdata`);
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json(); // Data is an array of objects
+                    
+                    if (data.length === 0) {
+                        // Improved visual feedback for empty state
+                        dataTableBody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500 bg-gray-50 italic">No records found in the database. Insert one above!</td></tr>';
+                        return;
+                    }
+
+                    // Map the array of data objects to HTML table rows
+                    dataTableBody.innerHTML = data.map(item => `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-600">${item.id}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.name}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.phone}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.city}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.course}</td>
+                        </tr>
+                    `).join('');
+                    
+                } catch (error) {
+                    console.error("Fetch error:", error);
+                    // Show a specific error message if the fetch failed due to connectivity
+                    dataTableBody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-red-500">Error fetching data: ${error.message}</td></tr>`;
+                    showMessage(`Could not load data: ${error.message}`, 'error');
+                }
+            }
+
+            /**
+             * Handles form submission for inserting data (POST /euron/insert).
+             */
+            document.getElementById('insertForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                insertBtn.disabled = true;
+                insertBtn.textContent = 'Inserting...';
+
+                const payload = {
+                    name: document.getElementById('insertName').value,
+                    phone: parseInt(document.getElementById('insertPhone').value), // Important: Must be an integer
+                    city: document.getElementById('insertCity').value,
+                    course: document.getElementById('insertCourse').value
+                };
+
+                try {
+                    const response = await fetchWithRetry(`${API_BASE_URL}/euron/insert`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(result.detail || result.message || "Failed to insert data.");
+                    }
+
+                    // Result is the inserted MongoDB ID, which is a success.
+                    showMessage(`Data inserted successfully with MongoDB ID: ${result}`, 'success');
+                    e.target.reset();
+                    fetchEuronData(); // Refresh the list
+                } catch (error) {
+                    console.error("Insert error:", error);
+                    showMessage(`Insert failed: ${error.message}`, 'error');
+                } finally {
+                    insertBtn.disabled = false;
+                    insertBtn.textContent = 'Insert Data';
+                }
+            });
+
+            /**
+             * Handles form submission for updating data (PUT /euron/update/{phone}).
+             */
+            document.getElementById('updateForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                updateBtn.disabled = true;
+                updateBtn.textContent = 'Updating...';
+
+                const phoneToUpdate = document.getElementById('updatePhone').value;
+
+                const payload = {
+                    // Note: The phone number used in the path is also sent in the body, but the backend only requires the new data fields (name, city, course)
+                    name: document.getElementById('updateName').value,
+                    phone: parseInt(phoneToUpdate), 
+                    city: document.getElementById('updateCity').value,
+                    course: document.getElementById('updateCourse').value
+                };
+                
+                try {
+                    const response = await fetchWithRetry(`${API_BASE_URL}/euron/update/${phoneToUpdate}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(result.detail || result.message || "Failed to update data.");
+                    }
+
+                    showMessage(result.msg || "Data updated successfully.", 'success');
+                    e.target.reset();
+                    fetchEuronData(); // Refresh the list
+                } catch (error) {
+                    console.error("Update error:", error);
+                    showMessage(`Update failed: ${error.message}`, 'error');
+                } finally {
+                    updateBtn.disabled = false;
+                    updateBtn.textContent = 'Update Data';
+                }
+            });
+
+            /**
+             * Handles form submission for deleting data (DELETE /euron/delete/{phone}).
+             */
+            document.getElementById('deleteForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                deleteBtn.disabled = true;
+                deleteBtn.textContent = 'Deleting...';
+                
+                const phoneToDelete = document.getElementById('deletePhone').value;
+                
+                try {
+                    // Using the endpoint for DELETE: /euron/delete/{phone}
+                    const response = await fetchWithRetry(`${API_BASE_URL}/euron/delete/${phoneToDelete}`, {
+                        method: 'DELETE'
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(result.detail || result.message || "Failed to delete data.");
+                    }
+
+                    showMessage(result.msg || "Data deleted successfully.", 'success');
+                    e.target.reset();
+                    fetchEuronData(); // Refresh the list
+                } catch (error) {
+                    console.error("Delete error:", error);
+                    showMessage(`Delete failed: ${error.message}`, 'error');
+                } finally {
+                    deleteBtn.disabled = false;
+                    deleteBtn.textContent = 'Delete Data';
+                }
+            });
+            
+        });
+    </script>
+</body>
+</html>
