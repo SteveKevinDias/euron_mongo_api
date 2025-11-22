@@ -7,7 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-        body {https://euron-mongo-api-j73m.onrender.com
+        body {
+            /* NOTE: The API_BASE_URL is defined in the script block, not here. */
             font-family: 'Inter', sans-serif;
             background-color: #f4f7f9;
         }
@@ -107,6 +108,7 @@
             </div>
             <div id="searchError" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg hidden text-sm text-red-700"></div>
         </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
             <div class="form-card bg-white p-6 rounded-xl border border-gray-200 lg:col-span-2">
                 <h2 class="text-2xl font-bold text-indigo-700 mb-4">1. Insert Data (POST /euron/insert)</h2>
@@ -129,15 +131,29 @@
         </div>
 
         <div class="bg-white p-6 rounded-xl border border-gray-200 form-card mb-12">
-            <h2 class="text-2xl font-bold text-yellow-700 mb-4">2. Update Data (PUT /euron/update/{phone})</h2>
+            <h2 class="text-2xl font-bold text-yellow-700 mb-4">2. Full Update Data (PUT /euron/update/{phone})</h2>
+            <p class="text-sm text-gray-500 mb-4">Requires all fields to be sent, even if only one changed.</p>
             <form id="updateForm" class="space-y-4 md:grid md:grid-cols-5 md:gap-4">
                 <input type="number" id="updatePhone" placeholder="Phone Number to Update (Key)" class="input-field md:col-span-1" required>
                 <input type="text" id="updateName" placeholder="New Name" class="input-field md:col-span-1" required>
                 <input type="text" id="updateCity" placeholder="New City" class="input-field md:col-span-1" required>
-                <input type="text" id="updateCourse" placeholder="New Course" class="input-field md:col-col-span-1" required>
+                <input type="text" id="updateCourse" placeholder="New Course" class="input-field md:col-span-1" required>
                 <button type="submit" id="updateBtn" class="btn-primary w-full bg-yellow-600 hover:bg-yellow-700 md:col-span-1">Update Data</button>
             </form>
         </div>
+
+        <div class="bg-white p-6 rounded-xl border border-gray-200 form-card mb-12">
+            <h2 class="text-2xl font-bold text-purple-700 mb-4">4. Partial Update Data (PATCH /euron/patch/{phone})</h2>
+            <p class="text-sm text-gray-500 mb-4">Only provide fields you wish to change. Phone is the key.</p>
+            <form id="patchForm" class="space-y-4 md:grid md:grid-cols-5 md:gap-4">
+                <input type="number" id="patchPhone" placeholder="Phone Number to Patch (Key)" class="input-field md:col-span-1" required>
+                <input type="text" id="patchName" placeholder="New Name (Optional)" class="input-field md:col-span-1">
+                <input type="text" id="patchCity" placeholder="New City (Optional)" class="input-field md:col-span-1">
+                <input type="text" id="patchCourse" placeholder="New Course (Optional)" class="input-field md:col-span-1">
+                <button type="submit" id="patchBtn" class="btn-primary w-full bg-purple-600 hover:bg-purple-700 md:col-span-1">Patch Data</button>
+            </form>
+        </div>
+
 
         <div class="bg-white p-6 rounded-xl border border-gray-200 form-card">
             <h2 class="text-3xl font-bold text-gray-900 mb-4">All Euron Records (GET /euron/getdata)</h2>
@@ -172,7 +188,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             
             // --- Authentication Credentials ---
-            // These must match your hardcoded values or be replaced with a proper token system.
             const ADMIN_USER = "admin";
             const ADMIN_PASS = "sd_123";
 
@@ -191,12 +206,13 @@
             const insertBtn = document.getElementById('insertBtn');
             const updateBtn = document.getElementById('updateBtn');
             const deleteBtn = document.getElementById('deleteBtn');
+            // New PATCH elements
+            const patchBtn = document.getElementById('patchBtn');
+            const patchForm = document.getElementById('patchForm');
 
 
             /**
              * Utility function to display success or error messages to the user (main app).
-             * @param {string} message - The message content.
-             * @param {string} type - 'success' or 'error'.
              */
             function showMessage(message, type) {
                 messagesDiv.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'border-green-400', 'border-red-400');
@@ -214,26 +230,16 @@
             
             /**
              * Fetches resources with exponential backoff and retry logic for network errors.
-             * @param {string} url - The API endpoint URL.
-             * @param {object} options - Fetch options (method, headers, body, etc.).
-             * @param {number} maxRetries - Maximum number of retries.
-             * @param {number} delay - Initial delay in milliseconds.
-             * @returns {Promise<Response>} The fetch response object.
-             * @throws {Error} If all retries fail due to a network error.
              */
             async function fetchWithRetry(url, options = {}, maxRetries = 3, delay = 1000) {
                 for (let i = 0; i < maxRetries; i++) {
                     try {
                         const response = await fetch(url, options);
-                        // We return the response even if not response.ok, so the caller can handle 4xx/5xx errors
                         return response; 
                     } catch (error) {
-                        // This catches network/CORS errors (e.g., connection refused, timeout).
                         if (i === maxRetries - 1) {
-                            // Last attempt failed, throw the network error
                             throw new Error(`Failed to connect to API at ${API_BASE_URL}. Ensure the service is running.`);
                         }
-                        // Exponential Backoff: Wait for delay * 2^i milliseconds before retrying
                         const sleepTime = delay * (2 ** i);
                         console.warn(`Fetch failed (attempt ${i + 1}/${maxRetries}). Retrying in ${sleepTime}ms...`);
                         await new Promise(resolve => setTimeout(resolve, sleepTime));
@@ -243,23 +249,18 @@
 
 
             // --- Authentication Logic ---
-
             loginForm.addEventListener('submit', (e) => {
                 e.preventDefault();
                 const username = document.getElementById('username').value;
                 const password = document.getElementById('password').value;
 
                 if (username === ADMIN_USER && password === ADMIN_PASS) {
-                    // Successful Login
                     loginContainer.classList.add('hidden');
                     mainContent.classList.remove('hidden');
-                    // Fetch data immediately after successful login
                     fetchEuronData(); 
                 } else {
-                    // Failed Login
                     loginMessage.textContent = "Invalid username or password.";
                     loginMessage.classList.remove('hidden');
-                    // Clear password field for security
                     document.getElementById('password').value = ''; 
                     setTimeout(() => {
                         loginMessage.classList.add('hidden');
@@ -268,7 +269,7 @@
             });
 
 
-            // --- Search/Read Single Data Logic ---
+            // --- Search/Read Single Data Logic (GET /euron/getdata/{phone}) ---
             searchForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 searchBtn.disabled = true;
@@ -276,7 +277,6 @@
 
                 const phone = document.getElementById('searchPhone').value; 
                 
-                // Clear previous results
                 searchResultDiv.classList.add('hidden');
                 searchErrorDiv.classList.add('hidden');
                 searchErrorDiv.textContent = '';
@@ -289,22 +289,18 @@
                 }
 
                 try {
-                    // Using GET /euron/getdata/{phone} endpoint
                     const response = await fetchWithRetry(`${API_BASE_URL}/euron/getdata/${phone}`);
-                    
                     const result = await response.json();
 
                     if (!response.ok) {
-                        // FastAPI returns 404/422/500 with JSON containing a 'detail' field for errors
-                        throw new Error(result.message || result.detail || `HTTP error! Status: ${response.status}`);
+                         throw new Error(result.message || result.detail || `HTTP error! Status: ${response.status}`);
                     }
                     
-                    // The backend returns an array for a single search, so we check the length
                     if (result.length === 0) {
                         throw new Error(`No record found with phone number: ${phone}`);
                     }
                     
-                    searchCode.textContent = JSON.stringify(result[0], null, 2); // Display the first result
+                    searchCode.textContent = JSON.stringify(result[0], null, 2); 
                     searchResultDiv.classList.remove('hidden');
 
                 } catch (error) {
@@ -318,13 +314,8 @@
             });
 
 
-            // --- CRUD/API Logic ---
-
-            /**
-             * Fetches all Euron data and populates the table. Uses GET /euron/getdata
-             */
+            // --- Read All Data Logic (GET /euron/getdata) ---
             window.fetchEuronData = async function() { 
-                // Check if content is visible (i.e., user is logged in)
                 if (mainContent.classList.contains('hidden')) {
                     dataTableBody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Please log in to view data.</td></tr>';
                     return;
@@ -332,7 +323,6 @@
 
                 dataTableBody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500"><span class="spinner"></span>Fetching data...</td></tr>';
                 try {
-                    // Using the new endpoint /euron/getdata
                     const response = await fetchWithRetry(`${API_BASE_URL}/euron/getdata`);
                     
                     if (!response.ok) {
@@ -340,15 +330,13 @@
                         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
                     }
                     
-                    const data = await response.json(); // Data is an array of objects
+                    const data = await response.json(); 
                     
                     if (data.length === 0) {
-                        // Improved visual feedback for empty state
                         dataTableBody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500 bg-gray-50 italic">No records found in the database. Insert one above!</td></tr>';
                         return;
                     }
 
-                    // Map the array of data objects to HTML table rows
                     dataTableBody.innerHTML = data.map(item => `
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-600">${item.id}</td>
@@ -361,15 +349,12 @@
                     
                 } catch (error) {
                     console.error("Fetch error:", error);
-                    // Show a specific error message if the fetch failed due to connectivity
                     dataTableBody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-red-500">Error fetching data: ${error.message}</td></tr>`;
                     showMessage(`Could not load data: ${error.message}`, 'error');
                 }
             }
 
-            /**
-             * Handles form submission for inserting data (POST /euron/insert).
-             */
+            // --- Create Logic (POST /euron/insert) ---
             document.getElementById('insertForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 insertBtn.disabled = true;
@@ -377,7 +362,7 @@
 
                 const payload = {
                     name: document.getElementById('insertName').value,
-                    phone: parseInt(document.getElementById('insertPhone').value), // Important: Must be an integer
+                    phone: parseInt(document.getElementById('insertPhone').value), 
                     city: document.getElementById('insertCity').value,
                     course: document.getElementById('insertCourse').value
                 };
@@ -395,10 +380,9 @@
                         throw new Error(result.detail || result.message || "Failed to insert data.");
                     }
 
-                    // Result is the inserted MongoDB ID, which is a success.
                     showMessage(`Data inserted successfully with MongoDB ID: ${result}`, 'success');
                     e.target.reset();
-                    fetchEuronData(); // Refresh the list
+                    fetchEuronData(); 
                 } catch (error) {
                     console.error("Insert error:", error);
                     showMessage(`Insert failed: ${error.message}`, 'error');
@@ -408,9 +392,7 @@
                 }
             });
 
-            /**
-             * Handles form submission for updating data (PUT /euron/update/{phone}).
-             */
+            // --- Full Update Logic (PUT /euron/update/{phone}) ---
             document.getElementById('updateForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 updateBtn.disabled = true;
@@ -418,10 +400,10 @@
 
                 const phoneToUpdate = document.getElementById('updatePhone').value;
 
+                // PUT requires ALL fields for the Pydantic model
                 const payload = {
-                    // Note: The phone number used in the path is also sent in the body, but the backend only requires the new data fields (name, city, course)
                     name: document.getElementById('updateName').value,
-                    phone: parseInt(phoneToUpdate), 
+                    phone: parseInt(phoneToUpdate), // Sent in body as per Pydantic model
                     city: document.getElementById('updateCity').value,
                     course: document.getElementById('updateCourse').value
                 };
@@ -441,7 +423,7 @@
 
                     showMessage(result.msg || "Data updated successfully.", 'success');
                     e.target.reset();
-                    fetchEuronData(); // Refresh the list
+                    fetchEuronData(); 
                 } catch (error) {
                     console.error("Update error:", error);
                     showMessage(`Update failed: ${error.message}`, 'error');
@@ -451,9 +433,63 @@
                 }
             });
 
-            /**
-             * Handles form submission for deleting data (DELETE /euron/delete/{phone}).
-             */
+            // --- Partial Update Logic (PATCH /euron/patch/{phone}) ---
+            patchForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                patchBtn.disabled = true;
+                patchBtn.textContent = 'Patching...';
+
+                const phoneToPatch = document.getElementById('patchPhone').value;
+                
+                const payload = {};
+                
+                // Fields to potentially update
+                const patchName = document.getElementById('patchName').value;
+                const patchCity = document.getElementById('patchCity').value;
+                const patchCourse = document.getElementById('patchCourse').value;
+                
+                // Always send the phone key, but only include optional fields if they have a value
+                payload.phone = parseInt(phoneToPatch); 
+                
+                if (patchName) payload.name = patchName;
+                if (patchCity) payload.city = patchCity;
+                if (patchCourse) payload.course = patchCourse;
+
+                // Check if any fields other than the key (phone) were provided
+                if (Object.keys(payload).length <= 1) { 
+                    showMessage("Patch failed: Provide at least one field (Name, City, or Course) to update.", 'error');
+                    patchBtn.disabled = false;
+                    patchBtn.textContent = 'Patch Data';
+                    return;
+                }
+                
+                try {
+                    const response = await fetchWithRetry(`${API_BASE_URL}/euron/patch/${phoneToPatch}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(result.detail || result.message || "Failed to patch data.");
+                    }
+
+                    showMessage(result.msg || "Data patched successfully.", 'success');
+                    e.target.reset();
+                    fetchEuronData(); 
+                } catch (error) {
+                    console.error("Patch error:", error);
+                    showMessage(`Patch failed: ${error.message}`, 'error');
+                } finally {
+                    patchBtn.disabled = false;
+                    patchBtn.textContent = 'Patch Data';
+                }
+            });
+
+
+            // --- Delete Logic (DELETE /euron/delete/{phone}) ---
             document.getElementById('deleteForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 deleteBtn.disabled = true;
@@ -462,7 +498,6 @@
                 const phoneToDelete = document.getElementById('deletePhone').value;
                 
                 try {
-                    // Using the endpoint for DELETE: /euron/delete/{phone}
                     const response = await fetchWithRetry(`${API_BASE_URL}/euron/delete/${phoneToDelete}`, {
                         method: 'DELETE'
                     });
@@ -475,7 +510,7 @@
 
                     showMessage(result.msg || "Data deleted successfully.", 'success');
                     e.target.reset();
-                    fetchEuronData(); // Refresh the list
+                    fetchEuronData(); 
                 } catch (error) {
                     console.error("Delete error:", error);
                     showMessage(`Delete failed: ${error.message}`, 'error');

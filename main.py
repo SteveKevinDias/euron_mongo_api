@@ -87,3 +87,15 @@ async def get_euron_data(phone:int):
     async for document in cursor:
         iterms.append(euron_helper(document)) # iterms.append(document)
     return iterms
+
+@app.patch("/euron/patch/{phone}")
+def patch_euron_data(phone:int, data:eurondata):
+    updated_data = {}
+    for key, value in data.dict().items():
+        if value is not None:
+            updated_data[key] = value
+    if updated_data:
+        result = euron_data.update_one({"phone": phone}, {"$set": updated_data})
+        if result.modified_count == 1:
+            return {"msg": "Data patched successfully"}
+    raise HTTPException(status_code=404, detail="Data not found or no changes made")
